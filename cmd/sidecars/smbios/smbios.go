@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"libvirt.org/go/libvirtxml"
@@ -36,14 +38,33 @@ const (
 	baseBoardManufacturerAnnotation = "smbios.vm.kubevirt.io/baseBoardManufacturer"
 )
 
+func fixHostdevMode(xmlData []byte) []byte {
+	xmlStr := string(xmlData)
+
+	// Find hostdev elements and check if they already have mode attribute
+	re := regexp.MustCompile(`<hostdev\s+([^>]*?)>`)
+
+	result := re.ReplaceAllStringFunc(xmlStr, func(match string) string {
+		// Check if mode attribute already exists
+		if strings.Contains(match, "mode=") {
+			return match // Already has mode, don't modify
+		}
+		// Add mode="subsystem" before the closing >
+		return strings.Replace(match, ">", ` mode="subsystem">`, 1)
+	})
+
+	return []byte(result)
+}
+
 func onDefineDomain(vmiJSON, domainXML []byte) (string, error) {
 	vmiSpec := vmSchema.VirtualMachineInstance{}
 	if err := json.Unmarshal(vmiJSON, &vmiSpec); err != nil {
 		return "", fmt.Errorf("Failed to unmarshal given VMI spec: %s %s", err, string(vmiJSON))
 	}
 
+	fixedXML := fixHostdevMode(domainXML)
 	domainSpec := libvirtxml.Domain{}
-	if err := xml.Unmarshal(domainXML, &domainSpec); err != nil {
+	if err := xml.Unmarshal(fixedXML, &domainSpec); err != nil {
 		return "", fmt.Errorf("Failed to unmarshal given Domain spec: %s %s", err, string(domainXML))
 	}
 
