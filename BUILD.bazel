@@ -287,6 +287,12 @@ oci_push(
 )
 
 oci_push(
+    name = "push-topology-hook-sidecar",
+    image = "//cmd/sidecars/topology:topology-hook-sidecar-image",
+    repository = "quay.io/kubevirt/topology-hook-sidecar",
+)
+
+oci_push(
     name = "push-example-disk-mutation-hook-sidecar",
     image = "//cmd/sidecars/disk-mutation:example-disk-mutation-hook-sidecar-image",
     repository = "quay.io/kubevirt/example-disk-mutation-hook-sidecar",
