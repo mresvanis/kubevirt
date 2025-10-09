@@ -773,4 +773,49 @@ var _ = Describe("test configuration", func() {
 		Entry("reference when InstancetypeConfiguration.ReferencePolicy is reference", &v1.InstancetypeConfiguration{ReferencePolicy: pointer.P(v1.Reference)}, v1.Reference),
 		Entry("expand InstancetypeConfiguration.ReferencePolicy is expand", &v1.InstancetypeConfiguration{ReferencePolicy: pointer.P(v1.Expand)}, v1.Expand),
 	)
+
+	Context("PCIeTopologyMapping feature gate", func() {
+		DescribeTable("should be correctly detected",
+			func(gateEnabled bool, expectedResult bool) {
+				var featureGates []string
+				if gateEnabled {
+					featureGates = []string{"PCIeTopologyMapping"}
+				}
+
+				clusterConfig, _, _ := testutils.NewFakeClusterConfigUsingKVConfig(&v1.KubeVirtConfiguration{
+					DeveloperConfiguration: &v1.DeveloperConfiguration{
+						FeatureGates: featureGates,
+					},
+				})
+
+				result := clusterConfig.PCIeTopologyMappingEnabled()
+				Expect(result).To(Equal(expectedResult))
+			},
+			Entry("when enabled in feature gates", true, true),
+			Entry("when not in feature gates", false, false),
+		)
+
+		It("should be disabled by default", func() {
+			clusterConfig, _, _ := testutils.NewFakeClusterConfigUsingKVConfig(&v1.KubeVirtConfiguration{})
+			Expect(clusterConfig.PCIeTopologyMappingEnabled()).To(BeFalse())
+		})
+
+		It("should handle mixed feature gates correctly", func() {
+			clusterConfig, _, _ := testutils.NewFakeClusterConfigUsingKVConfig(&v1.KubeVirtConfiguration{
+				DeveloperConfiguration: &v1.DeveloperConfiguration{
+					FeatureGates: []string{"SomeOtherFeature", "PCIeTopologyMapping", "AnotherFeature"},
+				},
+			})
+			Expect(clusterConfig.PCIeTopologyMappingEnabled()).To(BeTrue())
+		})
+
+		It("should handle case sensitivity correctly", func() {
+			clusterConfig, _, _ := testutils.NewFakeClusterConfigUsingKVConfig(&v1.KubeVirtConfiguration{
+				DeveloperConfiguration: &v1.DeveloperConfiguration{
+					FeatureGates: []string{"pcietopologymapping"}, // lowercase
+				},
+			})
+			Expect(clusterConfig.PCIeTopologyMappingEnabled()).To(BeFalse())
+		})
+	})
 })
