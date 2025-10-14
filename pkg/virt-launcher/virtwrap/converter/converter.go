@@ -113,6 +113,7 @@ type ConverterContext struct {
 	FreePageReporting               bool
 	BochsForEFIGuests               bool
 	SerialConsoleLog                bool
+	PCIeTopologyMappingEnabled      bool
 	DomainAttachmentByInterfaceName map[string]string
 }
 
@@ -1865,6 +1866,18 @@ func Convert_v1_VirtualMachineInstance_To_api_Domain(vmi *v1.VirtualMachineInsta
 			err = vcpu.AdjustDomainForTopologyAndCPUSet(domain, vmi, c.Topology, c.CPUSet, hasIOThreads(vmi))
 			if err != nil {
 				return err
+			}
+
+			if c.PCIeTopologyMappingEnabled {
+				// Create PCIe topology assigner for NUMA-aware device placement
+				pcieAssigner := NewPCIeNUMAAssigner(&domain.Spec)
+
+				pcieAssigner.AddDevices(c.GenericHostDevices)
+				pcieAssigner.AddDevices(c.GPUHostDevices)
+
+				if err := pcieAssigner.PlaceDevices(); err != nil {
+					log.Log.Reason(err).Warningf("Failed to process PCIe topology, falling back to default placement")
+				}
 			}
 		}
 	}
